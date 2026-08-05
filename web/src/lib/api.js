@@ -15,6 +15,7 @@ async function request(path, options = {}) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Request failed: ${res.status}`);
   }
+  if (res.status === 204) return null;
   return res.json();
 }
 
@@ -42,4 +43,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ role, email, password }),
     }),
+  getAllMenuItems: () => request("/menu/all"),
+  createMenuItem: (item) =>
+    request("/menu", { method: "POST", body: JSON.stringify(item) }),
+  updateMenuItem: (id, patch) =>
+    request(`/menu/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  deleteMenuItem: (id) => request(`/menu/${id}`, { method: "DELETE" }),
+  getAnalytics: () => request("/analytics"),
 };

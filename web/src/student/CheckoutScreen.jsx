@@ -150,18 +150,6 @@ export default function CheckoutScreen() {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            fontSize: 14,
-            padding: "6px 0",
-            color: "#4a463f",
-          }}
-        >
-          <span>Convenience fee</span>
-          <span>₹{CONVENIENCE_FEE_RUPEES}</span>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
             fontSize: 16,
             fontWeight: 700,
             marginTop: 10,
@@ -195,6 +183,26 @@ export default function CheckoutScreen() {
           maxWidth: 440,
         }}
       >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "rgba(223,162,74,0.12)",
+            border: "1px solid var(--mobile-accent)",
+            borderRadius: 12,
+            padding: "8px 12px",
+            marginBottom: 8,
+          }}
+        >
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--mobile-hero)", fontWeight: 600 }}>
+            <span aria-hidden="true">⚡</span>
+            Convenience fee for faster order processing
+          </span>
+          <span style={{ fontSize: 12, color: "var(--mobile-hero)", fontWeight: 700 }}>
+            ₹{CONVENIENCE_FEE_RUPEES}
+          </span>
+        </div>
         <button
           onClick={payAndPlaceOrder}
           style={{

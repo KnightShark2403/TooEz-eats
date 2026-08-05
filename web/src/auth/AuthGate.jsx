@@ -31,6 +31,20 @@ const THEME = {
     title: "Canteen staff login",
     subtitle: "Sign in to manage incoming orders.",
   },
+  manager: {
+    bg: "var(--dash-bg)",
+    card: "var(--dash-card)",
+    text: "#f2ede4",
+    subtext: "#8a8378",
+    border: "#2a241d",
+    accentText: "var(--dash-accent)",
+    eyebrow: "#8a8378",
+    button: "var(--dash-accent)",
+    buttonText: "#1c1408",
+    brand: "TooEz Eats",
+    title: "Manager login",
+    subtitle: "Sign in to view income, analytics, and manage the menu.",
+  },
 };
 
 // Gates its children behind login/signup for the given role. Renders
@@ -79,7 +93,7 @@ export default function AuthGate({ role, children }) {
           borderRadius: 14,
           border: `1px solid ${t.border}`,
           fontSize: 16,
-          background: role === "staff" ? "#141210" : "#fff",
+          background: role === "student" ? "#fff" : "#141210",
           color: t.text,
         }}
       />

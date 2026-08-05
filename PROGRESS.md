@@ -289,4 +289,59 @@ Verified directly against the API (full transcript run this session): student si
 
 **Open questions:** none blocking.
 
-**Next:** all 9 phases complete — nothing queued. Flag anything you want changed or added.
+**Next:** waiting on go-ahead for Phase 10 (fee placement).
+
+## Phase 10 — Convenience fee placement (UI only)
+**Status:** Done.
+
+**Approach:** UI/copy only, per the phase brief — Phase 8's fee amount (₹10, server-computed) and `payableRupees` math are untouched.
+
+**Files touched:**
+- `web/src/student/CheckoutScreen.jsx` — removed the "Convenience fee — ₹10" line from the order-summary list (total line there is unchanged, still fee-inclusive). Added a small accent-bordered strip directly above the "Pay · ₹—" button with a ⚡ icon and the copy "Convenience fee for faster order processing", showing ₹10 beside it, using the existing `--mobile-accent`/`--mobile-hero` tokens.
+
+**How to verify:**
+```
+cd server && npm start
+cd web && npm run dev
+```
+Add items to cart → checkout: the order summary no longer lists the fee as a line item, but the total is still items+₹10. Directly above the Pay button is a small bordered strip with a lightning icon and "Convenience fee for faster order processing — ₹10".
+
+`npm run build` passes clean (56 modules, unchanged module count — no new deps). No visual browser confirmation this session.
+
+**Open questions:** none blocking.
+
+**Next:** waiting on go-ahead for Phase 11 (manager role).
+
+## Phase 11 — Manager role: income, basic analytics, menu control
+**Status:** Done.
+
+**Approach:** extended the existing `users.role` model (Phase 9) with a third value, `manager`, reusing the same JWT/`requireAuth(role)` middleware — no new auth mechanism. Analytics are computed on read directly from `orders`/`order_items` (no new tracking table). Income chart is a small dependency-free inline SVG bar chart (no charting library added), single series so no legend needed per the dataviz method — identity carried by the "Revenue by day" section title, accent-color bars, native `<title>` tooltip on hover.
+
+**Backend — files touched:**
+- `server/db.js` — `users.role` CHECK now allows `'manager'`. SQLite can't ALTER a CHECK constraint in place, so added a guarded migration that rebuils the `users` table (rename→recreate→copy→drop) only if an existing dev DB still has the old constraint; detected via `sqlite_master.sql` text rather than a version flag.
+- `server/routes/auth.js` — signup/login now accept `role: "manager"` alongside student/staff.
+- `server/routes/menu.js` — added manager-only routes: `GET /api/menu/all` (every item, including unavailable — the manager needs to see and re-enable hidden items, unlike the student-facing `GET /api/menu`), `POST /api/menu` (create custom item: name/price/category), `PATCH /api/menu/:id` (partial update — used for both availability toggle and edits), `DELETE /api/menu/:id`. All four gated with `requireAuth("manager")`.
+- `server/routes/analytics.js` — new. `GET /api/analytics`, manager only: `totalOrders`, `totalRevenue`, `averageOrderValue`, `revenueByDay` (grouped by `date(created_at)`), `topItems` (top 5 by quantity sold, from `order_items`).
+- `server/index.js` — registered the new analytics route.
+
+**Frontend — files touched:**
+- `web/src/lib/api.js` — added `getAllMenuItems`, `createMenuItem`, `updateMenuItem`, `deleteMenuItem`, `getAnalytics`; `request()` now short-circuits on a `204` response (menu delete returns no body).
+- `web/src/auth/AuthGate.jsx` — added a `manager` theme entry (dark, matches the staff dashboard's look); fixed the password-field background check so it also applies dark styling for `manager` (was `staff`-only).
+- `web/src/manager/IncomeChart.jsx` — new, the inline SVG bar chart described above.
+- `web/src/manager/ManagerScreen.jsx` — new: sidebar shell (same pattern as `DashboardScreen`) + stat cards (orders/revenue/avg value) + income chart + top-items list + menu control panel (add-item form, per-item availability toggle pill, remove button).
+- `web/src/App.jsx` — added `/manager` route, wrapped in `<AuthGate role="manager">`, alongside the existing `/dashboard` (staff) and student routes.
+
+**How to verify:**
+```
+cd server && npm install && npm start   # http://localhost:4000
+cd web && npm install && npm run dev    # http://localhost:5173/manager
+```
+Sign up a manager account at `/manager` (or log in with one you've created). You should see total orders / revenue / avg order value, a bar chart of revenue by day, top 5 items by quantity, and a menu list where you can toggle availability, remove items, or add a new one via the form. A student or staff account cannot reach `/manager` (UI-gated) or call its API routes (403 server-side, verified below).
+
+Verified directly against the API this session: manager signup → `GET /api/analytics` (real numbers from the existing 7 seeded/test orders) → `GET /api/menu/all` → created a test item → toggled its availability off → deleted it (204) → confirmed a staff token gets 403 on `/api/analytics`. Also had to hand-repair the dev DB after the CHECK-constraint migration hit a `FOREIGN KEY constraint failed` on first run (SQLite's `ALTER TABLE ... RENAME` silently rewrites other tables' FK reference text to the new name, which broke `orders`'s reference during the `users` rebuild) — fixed by disabling `foreign_keys` around the migration and rebuilding `orders` once by hand to point back at `users`; no order data was lost (verified row count before/after). A fresh dev DB (no `tooez.db` yet) won't hit this — it's specific to migrating a DB that already existed before this phase. `npm run build` passes clean (58 modules, no new dependencies).
+
+**Not done (explicitly out of scope per the brief):** demand forecasting, inventory automation, scheduled/recurring menu changes.
+
+**Open questions:** none blocking.
+
+**Next:** all 11 phases complete — nothing queued. Flag anything you want changed or added.

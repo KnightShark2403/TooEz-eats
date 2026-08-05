@@ -15,8 +15,8 @@ router.post("/signup", async (req, res) => {
   const email = normalizeEmail(req.body.email);
   const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
 
-  if (!["student", "staff"].includes(role)) {
-    return res.status(400).json({ error: "role must be student or staff" });
+  if (!["student", "staff", "manager"].includes(role)) {
+    return res.status(400).json({ error: "role must be student, staff, or manager" });
   }
   if (!email) return res.status(400).json({ error: "Email is required" });
   if (!name) return res.status(400).json({ error: "Name is required" });
@@ -43,8 +43,8 @@ router.post("/login", async (req, res) => {
   const { role, password } = req.body;
   const email = normalizeEmail(req.body.email);
 
-  if (!["student", "staff"].includes(role)) {
-    return res.status(400).json({ error: "role must be student or staff" });
+  if (!["student", "staff", "manager"].includes(role)) {
+    return res.status(400).json({ error: "role must be student, staff, or manager" });
   }
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });

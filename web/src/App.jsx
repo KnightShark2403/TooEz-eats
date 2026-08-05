@@ -7,6 +7,7 @@ import CheckoutScreen from "./student/CheckoutScreen.jsx";
 import OrderStatusScreen from "./student/OrderStatusScreen.jsx";
 import ProfileScreen from "./student/ProfileScreen.jsx";
 import DashboardScreen from "./dashboard/DashboardScreen.jsx";
+import ManagerScreen from "./manager/ManagerScreen.jsx";
 
 function StudentApp() {
   return (
@@ -32,11 +33,20 @@ function StaffApp() {
   );
 }
 
+function ManagerApp() {
+  return (
+    <AuthGate role="manager">
+      <ManagerScreen />
+    </AuthGate>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/dashboard" element={<StaffApp />} />
+        <Route path="/manager" element={<ManagerApp />} />
         <Route path="/*" element={<StudentApp />} />
       </Routes>
     </BrowserRouter>

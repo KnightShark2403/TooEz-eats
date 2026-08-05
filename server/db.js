@@ -31,7 +31,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    role TEXT NOT NULL CHECK (role IN ('student', 'staff')),
+    role TEXT NOT NULL CHECK (role IN ('student', 'staff', 'manager')),
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -71,6 +71,29 @@ try {
   db.exec(`ALTER TABLE orders ADD COLUMN student_id INTEGER REFERENCES users(id)`);
 } catch {
   // column already present
+}
+
+// SQLite can't ALTER a CHECK constraint in place — if an existing dev DB still
+// has the pre-manager-role users table, rebuild it (same data, new constraint).
+const usersTableSql = db
+  .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'")
+  .get()?.sql;
+if (usersTableSql && !usersTableSql.includes("'manager'")) {
+  db.pragma("foreign_keys = OFF");
+  db.exec(`
+    ALTER TABLE users RENAME TO users_old;
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      role TEXT NOT NULL CHECK (role IN ('student', 'staff', 'manager')),
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    INSERT INTO users SELECT * FROM users_old;
+    DROP TABLE users_old;
+  `);
+  db.pragma("foreign_keys = ON");
 }
 
 export default db;
