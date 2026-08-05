@@ -1,9 +1,5 @@
-const KEY = "tooez_student_name";
+import { getUser } from "./auth.js";
 
 export function getStudentName() {
-  return localStorage.getItem(KEY) || "";
-}
-
-export function setStudentName(name) {
-  localStorage.setItem(KEY, name.trim());
+  return getUser()?.name || "";
 }

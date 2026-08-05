@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
-import { getStudentName } from "../lib/student.js";
+import { getToken } from "../lib/auth.js";
 import { usePolling } from "../lib/usePolling.js";
 import { STATUSES } from "./statuses.js";
 import BottomTabBar from "./BottomTabBar.jsx";
@@ -17,10 +17,9 @@ export default function OrderStatusScreen() {
 
   usePolling(
     () => {
-      const name = getStudentName();
-      if (!name) return Promise.resolve();
+      if (!getToken()) return Promise.resolve();
       return api
-        .getOrders(name)
+        .getMyOrders()
         .then((orders) => {
           const found = orders.find((o) => String(o.id) === id);
           if (!found) return setError("Order not found");
@@ -167,6 +166,32 @@ export default function OrderStatusScreen() {
             <span>₹{item.price_rupees * item.quantity}</span>
           </div>
         ))}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: 14,
+            padding: "6px 0",
+            color: "#4a463f",
+          }}
+        >
+          <span>Convenience fee</span>
+          <span>₹{order.convenience_fee_rupees}</span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: 15,
+            fontWeight: 700,
+            marginTop: 4,
+            paddingTop: 10,
+            borderTop: "1px solid #f0ebe0",
+          }}
+        >
+          <span>Total</span>
+          <span>₹{order.total_rupees}</span>
+        </div>
       </div>
 
       <BottomTabBar activeOrder={order.status !== "Completed" ? order : null} activeKey={order.status} />

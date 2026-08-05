@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "./state/CartContext.jsx";
-import NameGate from "./student/NameGate.jsx";
+import AuthGate from "./auth/AuthGate.jsx";
 import MenuScreen from "./student/MenuScreen.jsx";
 import CartScreen from "./student/CartScreen.jsx";
 import CheckoutScreen from "./student/CheckoutScreen.jsx";
@@ -10,7 +10,7 @@ import DashboardScreen from "./dashboard/DashboardScreen.jsx";
 
 function StudentApp() {
   return (
-    <NameGate>
+    <AuthGate role="student">
       <CartProvider>
         <Routes>
           <Route path="/" element={<MenuScreen />} />
@@ -20,7 +20,15 @@ function StudentApp() {
           <Route path="/profile" element={<ProfileScreen />} />
         </Routes>
       </CartProvider>
-    </NameGate>
+    </AuthGate>
+  );
+}
+
+function StaffApp() {
+  return (
+    <AuthGate role="staff">
+      <DashboardScreen />
+    </AuthGate>
   );
 }
 
@@ -28,7 +36,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/dashboard" element={<DashboardScreen />} />
+        <Route path="/dashboard" element={<StaffApp />} />
         <Route path="/*" element={<StudentApp />} />
       </Routes>
     </BrowserRouter>

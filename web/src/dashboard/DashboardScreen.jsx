@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../lib/api.js";
+import { getUser, clearSession } from "../lib/auth.js";
 import { usePolling } from "../lib/usePolling.js";
 import KanbanBoard from "./KanbanBoard.jsx";
 
@@ -62,47 +63,76 @@ export default function DashboardScreen() {
           borderRight: "1px solid #1f1b17",
           padding: "24px 16px",
           color: "#c8c0b2",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 32 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 32 }}>
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                background: "var(--dash-accent)",
+                color: "#1c1408",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 800,
+              }}
+            >
+              T
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#f2ede4" }}>TooEz Eats</div>
+              <div className="eyebrow" style={{ color: "#8a8378" }}>
+                Canteen Console
+              </div>
+            </div>
+          </div>
+
           <div
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              background: "var(--dash-accent)",
-              color: "#1c1408",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 800,
+              gap: 10,
+              padding: "10px 12px",
+              borderRadius: 12,
+              background: "var(--dash-sidebar-active)",
+              color: "var(--dash-accent)",
+              fontWeight: 600,
+              fontSize: 14,
             }}
           >
-            T
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#f2ede4" }}>TooEz Eats</div>
-            <div className="eyebrow" style={{ color: "#8a8378" }}>
-              Canteen Console
-            </div>
+            <span>📋</span>
+            Orders
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "10px 12px",
-            borderRadius: 12,
-            background: "var(--dash-sidebar-active)",
-            color: "var(--dash-accent)",
-            fontWeight: 600,
-            fontSize: 14,
-          }}
-        >
-          <span>📋</span>
-          Orders
+        <div>
+          <div style={{ fontSize: 12, color: "#8a8378", marginBottom: 8 }}>
+            {getUser()?.name}
+          </div>
+          <button
+            onClick={() => {
+              clearSession();
+              window.location.reload();
+            }}
+            style={{
+              width: "100%",
+              background: "none",
+              border: "1px solid #2a241d",
+              borderRadius: 12,
+              padding: "10px 12px",
+              color: "#c8c0b2",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            Log out
+          </button>
         </div>
       </aside>
 

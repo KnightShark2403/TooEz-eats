@@ -1,7 +1,20 @@
-import db from "./db.js";
+import bcrypt from "bcryptjs";
+import db, { CONVENIENCE_FEE_RUPEES } from "./db.js";
 
-db.exec("DELETE FROM order_items; DELETE FROM orders; DELETE FROM menu_items;");
-db.exec("DELETE FROM sqlite_sequence WHERE name IN ('menu_items', 'orders', 'order_items');");
+db.exec("DELETE FROM order_items; DELETE FROM orders; DELETE FROM menu_items; DELETE FROM users;");
+db.exec(
+  "DELETE FROM sqlite_sequence WHERE name IN ('menu_items', 'orders', 'order_items', 'users');"
+);
+
+// Demo staff login for the dashboard — students sign up for real through the app.
+const STAFF_EMAIL = "staff@tooez.test";
+const STAFF_PASSWORD = "staff123";
+db.prepare("INSERT INTO users (role, email, password_hash, name) VALUES (?, ?, ?, ?)").run(
+  "staff",
+  STAFF_EMAIL,
+  bcrypt.hashSync(STAFF_PASSWORD, 10),
+  "Canteen Staff"
+);
 
 const menuItems = [
   { name: "Veg Thali", description: "Rice, dal, sabzi, roti, pickle", price_rupees: 90, category: "Mains" },
@@ -34,14 +47,15 @@ function minutesAgoTimestamp(minutes) {
 
 function seedOrder(studentName, status, itemQtyPairs, minutesAgo) {
   const items = itemQtyPairs.map(([name, quantity]) => ({ item: menuByName[name], quantity }));
-  const total = items.reduce((sum, i) => sum + i.item.price_rupees * i.quantity, 0);
+  const itemsTotal = items.reduce((sum, i) => sum + i.item.price_rupees * i.quantity, 0);
+  const total = itemsTotal + CONVENIENCE_FEE_RUPEES;
   const ts = minutesAgoTimestamp(minutesAgo);
 
   const { lastInsertRowid: orderId } = db
     .prepare(
-      "INSERT INTO orders (student_name, status, total_rupees, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+      "INSERT INTO orders (student_name, status, total_rupees, convenience_fee_rupees, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
     )
-    .run(studentName, status, total, ts, ts);
+    .run(studentName, status, total, CONVENIENCE_FEE_RUPEES, ts, ts);
 
   const insertItem = db.prepare(
     "INSERT INTO order_items (order_id, menu_item_id, name, price_rupees, quantity) VALUES (?, ?, ?, ?, ?)"
@@ -58,3 +72,4 @@ seedOrder("Karthik", "Ready for Pickup", [["Grilled Sandwich", 2], ["Fresh Lime 
 seedOrder("Meera", "Completed", [["Samosa (2 pcs)", 1], ["Masala Chai", 1]], 25);
 
 console.log(`Seeded ${menuItems.length} menu items and 5 sample orders.`);
+console.log(`Demo staff login: ${STAFF_EMAIL} / ${STAFF_PASSWORD}`);

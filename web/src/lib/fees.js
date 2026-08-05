@@ -1,0 +1,1 @@
+export const CONVENIENCE_FEE_RUPEES = 10;

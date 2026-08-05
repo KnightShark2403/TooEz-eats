@@ -4,6 +4,7 @@ import { useCart } from "../state/CartContext.jsx";
 import { api } from "../lib/api.js";
 import { getStudentName } from "../lib/student.js";
 import { charge } from "../lib/paymentGateway.js";
+import { CONVENIENCE_FEE_RUPEES } from "../lib/fees.js";
 import EmptyState from "./EmptyState.jsx";
 
 // STAGE: "idle" (reviewing) -> "processing" (stub gateway call) ->
@@ -14,6 +15,7 @@ export default function CheckoutScreen() {
   const [stage, setStage] = useState("idle");
   const [error, setError] = useState(null);
   const name = getStudentName();
+  const payableRupees = totalRupees + CONVENIENCE_FEE_RUPEES;
 
   if (items.length === 0) {
     return (
@@ -30,14 +32,13 @@ export default function CheckoutScreen() {
     setStage("processing");
     setError(null);
     try {
-      const payment = await charge({ amountRupees: totalRupees });
+      const payment = await charge({ amountRupees: payableRupees });
       if (!payment.success) throw new Error("Payment failed — please try again.");
 
       setStage("success");
       await new Promise((resolve) => setTimeout(resolve, 600));
 
       const order = await api.createOrder(
-        name,
         items.map((i) => ({ menu_item_id: i.menuItem.id, quantity: i.quantity }))
       );
       clear();
@@ -70,7 +71,7 @@ export default function CheckoutScreen() {
             <p style={{ color: "#4a463f", fontSize: 15, fontWeight: 600 }}>
               Processing payment…
             </p>
-            <p style={{ color: "#8a857a", fontSize: 12 }}>₹{totalRupees} · stub gateway</p>
+            <p style={{ color: "#8a857a", fontSize: 12 }}>₹{payableRupees} · stub gateway</p>
           </>
         ) : (
           <>
@@ -149,6 +150,18 @@ export default function CheckoutScreen() {
           style={{
             display: "flex",
             justifyContent: "space-between",
+            fontSize: 14,
+            padding: "6px 0",
+            color: "#4a463f",
+          }}
+        >
+          <span>Convenience fee</span>
+          <span>₹{CONVENIENCE_FEE_RUPEES}</span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
             fontSize: 16,
             fontWeight: 700,
             marginTop: 10,
@@ -157,7 +170,7 @@ export default function CheckoutScreen() {
           }}
         >
           <span>Total ({totalCount} items)</span>
-          <span>₹{totalRupees}</span>
+          <span>₹{payableRupees}</span>
         </div>
       </div>
 
@@ -196,7 +209,7 @@ export default function CheckoutScreen() {
             cursor: "pointer",
           }}
         >
-          Pay · ₹{totalRupees}
+          Pay · ₹{payableRupees}
         </button>
       </div>
     </div>

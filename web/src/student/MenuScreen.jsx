@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { getStudentName } from "../lib/student.js";
-import { useActiveOrder } from "../lib/useActiveOrder.js";
+import { useActiveOrders } from "../lib/useActiveOrders.js";
 import { visualForItem } from "../lib/menuVisuals.js";
 import { useCart } from "../state/CartContext.jsx";
 import BottomTabBar from "./BottomTabBar.jsx";
@@ -17,7 +17,8 @@ function greeting() {
 export default function MenuScreen() {
   const navigate = useNavigate();
   const { addItem, totalCount, totalRupees } = useCart();
-  const { activeOrder } = useActiveOrder();
+  const { activeOrders } = useActiveOrders();
+  const primaryActiveOrder = activeOrders[0] || null;
   const [menu, setMenu] = useState([]);
   const [category, setCategory] = useState("All");
   const [loading, setLoading] = useState(true);
@@ -60,35 +61,45 @@ export default function MenuScreen() {
         </h1>
       </div>
 
-      {activeOrder && (
-        <div style={{ padding: "0 20px 20px" }}>
-          <button
-            onClick={() => navigate(`/order/${activeOrder.id}`)}
-            style={{
-              width: "100%",
-              textAlign: "left",
-              background: "var(--mobile-hero)",
-              borderRadius: 20,
-              padding: 20,
-              border: "none",
-              cursor: "pointer",
-              color: "#fff",
-            }}
-          >
-            <p
-              className="eyebrow"
-              style={{ color: "var(--mobile-accent)", margin: "0 0 6px" }}
+      {activeOrders.length > 0 && (
+        <div
+          style={{
+            padding: "0 20px 20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          {activeOrders.map((order) => (
+            <button
+              key={order.id}
+              onClick={() => navigate(`/order/${order.id}`)}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                background: "var(--mobile-hero)",
+                borderRadius: 20,
+                padding: 20,
+                border: "none",
+                cursor: "pointer",
+                color: "#fff",
+              }}
             >
-              Live Order
-            </p>
-            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
-              {activeOrder.status}
-            </div>
-            <div style={{ fontSize: 13, opacity: 0.75 }}>
-              Order #{activeOrder.id} · {activeOrder.items.length} item
-              {activeOrder.items.length === 1 ? "" : "s"} · ₹{activeOrder.total_rupees}
-            </div>
-          </button>
+              <p
+                className="eyebrow"
+                style={{ color: "var(--mobile-accent)", margin: "0 0 6px" }}
+              >
+                Live Order
+              </p>
+              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
+                {order.status}
+              </div>
+              <div style={{ fontSize: 13, opacity: 0.75 }}>
+                Order #{order.id} · {order.items.length} item
+                {order.items.length === 1 ? "" : "s"} · ₹{order.total_rupees}
+              </div>
+            </button>
+          ))}
         </div>
       )}
 
@@ -226,7 +237,7 @@ export default function MenuScreen() {
         </button>
       )}
 
-      <BottomTabBar activeOrder={activeOrder} activeKey="Home" />
+      <BottomTabBar activeOrder={primaryActiveOrder} activeKey="Home" />
     </div>
   );
 }

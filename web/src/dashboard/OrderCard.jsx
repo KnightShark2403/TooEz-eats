@@ -45,6 +45,10 @@ export default function OrderCard({ order, onAdvance, advancing }) {
             <span style={{ opacity: 0.6 }}>x{item.quantity}</span>
           </div>
         ))}
+        <div style={{ display: "flex", justifyContent: "space-between", opacity: 0.6 }}>
+          <span>Convenience fee</span>
+          <span>₹{order.convenience_fee_rupees}</span>
+        </div>
       </div>
 
       <div

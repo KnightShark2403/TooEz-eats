@@ -1,13 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import { getStudentName } from "../lib/student.js";
+import { clearSession } from "../lib/auth.js";
 import BottomTabBar from "./BottomTabBar.jsx";
 
 export default function ProfileScreen() {
   const navigate = useNavigate();
   const name = getStudentName();
 
-  const switchStudent = () => {
-    localStorage.removeItem("tooez_student_name");
+  const logOut = () => {
+    clearSession();
     navigate("/");
     window.location.reload();
   };
@@ -30,7 +31,7 @@ export default function ProfileScreen() {
         <div style={{ fontSize: 16, fontWeight: 600 }}>{name}</div>
       </div>
       <button
-        onClick={switchStudent}
+        onClick={logOut}
         style={{
           background: "none",
           border: "1px solid #e4ddd0",
@@ -41,7 +42,7 @@ export default function ProfileScreen() {
           cursor: "pointer",
         }}
       >
-        Switch student
+        Log out
       </button>
       <BottomTabBar activeOrder={null} activeKey="Profile" />
     </div>

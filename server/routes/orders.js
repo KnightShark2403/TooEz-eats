@@ -1,5 +1,6 @@
 import { Router } from "express";
-import db, { STATUSES } from "../db.js";
+import db, { STATUSES, CONVENIENCE_FEE_RUPEES } from "../db.js";
+import { requireAuth } from "../auth.js";
 
 const router = Router();
 
@@ -10,25 +11,25 @@ function serializeOrder(order) {
   return { ...order, items };
 }
 
-// GET /api/orders?student_name=Alice
-router.get("/", (req, res) => {
-  const { student_name } = req.query;
-  const orders = student_name
-    ? db
-        .prepare("SELECT * FROM orders WHERE student_name = ? ORDER BY created_at DESC")
-        .all(student_name)
-    : db.prepare("SELECT * FROM orders ORDER BY created_at DESC").all();
-
+// GET /api/orders — staff only, every order in the queue
+router.get("/", requireAuth("staff"), (req, res) => {
+  const orders = db.prepare("SELECT * FROM orders ORDER BY created_at DESC").all();
   res.json(orders.map(serializeOrder));
 });
 
-// POST /api/orders  { student_name, items: [{ menu_item_id, quantity }] }
-router.post("/", (req, res) => {
-  const { student_name, items } = req.body;
+// GET /api/orders/mine — student only, just the logged-in student's orders
+router.get("/mine", requireAuth("student"), (req, res) => {
+  const orders = db
+    .prepare("SELECT * FROM orders WHERE student_id = ? ORDER BY created_at DESC")
+    .all(req.user.id);
+  res.json(orders.map(serializeOrder));
+});
 
-  if (!student_name || typeof student_name !== "string" || !student_name.trim()) {
-    return res.status(400).json({ error: "student_name is required" });
-  }
+// POST /api/orders  { items: [{ menu_item_id, quantity }] } — student only,
+// the order is attributed to whichever account the bearer token belongs to.
+router.post("/", requireAuth("student"), (req, res) => {
+  const { items } = req.body;
+
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "items must be a non-empty array" });
   }
@@ -46,17 +47,18 @@ router.post("/", (req, res) => {
     resolvedItems.push({ menuItem, quantity });
   }
 
-  const total = resolvedItems.reduce(
+  const itemsTotal = resolvedItems.reduce(
     (sum, { menuItem, quantity }) => sum + menuItem.price_rupees * quantity,
     0
   );
+  const total = itemsTotal + CONVENIENCE_FEE_RUPEES;
 
   const createOrder = db.transaction(() => {
     const { lastInsertRowid: orderId } = db
       .prepare(
-        "INSERT INTO orders (student_name, status, total_rupees) VALUES (?, 'New', ?)"
+        "INSERT INTO orders (student_id, student_name, status, total_rupees, convenience_fee_rupees) VALUES (?, ?, 'New', ?, ?)"
       )
-      .run(student_name.trim(), total);
+      .run(req.user.id, req.user.name, total, CONVENIENCE_FEE_RUPEES);
 
     const insertItem = db.prepare(
       "INSERT INTO order_items (order_id, menu_item_id, name, price_rupees, quantity) VALUES (?, ?, ?, ?, ?)"
@@ -73,8 +75,8 @@ router.post("/", (req, res) => {
   res.status(201).json(serializeOrder(order));
 });
 
-// PATCH /api/orders/:id/status  { status }
-router.patch("/:id/status", (req, res) => {
+// PATCH /api/orders/:id/status  { status } — staff only
+router.patch("/:id/status", requireAuth("staff"), (req, res) => {
   const { status } = req.body;
   if (!STATUSES.includes(status)) {
     return res.status(400).json({ error: `status must be one of: ${STATUSES.join(", ")}` });

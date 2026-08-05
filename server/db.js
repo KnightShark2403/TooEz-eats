@@ -16,6 +16,8 @@ export const STATUSES = [
   "Completed",
 ];
 
+export const CONVENIENCE_FEE_RUPEES = 10;
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS menu_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,11 +29,22 @@ db.exec(`
     available INTEGER NOT NULL DEFAULT 1
   );
 
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role TEXT NOT NULL CHECK (role IN ('student', 'staff')),
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER REFERENCES users(id),
     student_name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'New',
     total_rupees INTEGER NOT NULL,
+    convenience_fee_rupees INTEGER NOT NULL DEFAULT ${CONVENIENCE_FEE_RUPEES},
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -45,5 +58,19 @@ db.exec(`
     quantity INTEGER NOT NULL
   );
 `);
+
+// Migrations for DBs created before these columns existed.
+try {
+  db.exec(
+    `ALTER TABLE orders ADD COLUMN convenience_fee_rupees INTEGER NOT NULL DEFAULT ${CONVENIENCE_FEE_RUPEES}`
+  );
+} catch {
+  // column already present
+}
+try {
+  db.exec(`ALTER TABLE orders ADD COLUMN student_id INTEGER REFERENCES users(id)`);
+} catch {
+  // column already present
+}
 
 export default db;
