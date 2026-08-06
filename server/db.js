@@ -96,4 +96,32 @@ if (usersTableSql && !usersTableSql.includes("'manager'")) {
   db.pragma("foreign_keys = ON");
 }
 
+// SQLite's RENAME TABLE rewrites *other* tables' foreign-key reference text
+// to follow the rename — so the users-table rebuild above (which renames
+// users -> users_old -> users) can leave unrelated tables' FKs pointing at a
+// "_old" name if they were ever rebuilt the same way. order_items.order_id
+// picked up "orders_old" from an earlier hand-repair of the orders table,
+// which breaks every order INSERT ("no such table: main.orders_old").
+// Rebuild it in place, detected via sqlite_master text rather than a flag.
+const orderItemsTableSql = db
+  .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'order_items'")
+  .get()?.sql;
+if (orderItemsTableSql && !orderItemsTableSql.includes("REFERENCES orders(id)")) {
+  db.pragma("foreign_keys = OFF");
+  db.exec(`
+    ALTER TABLE order_items RENAME TO order_items_old;
+    CREATE TABLE order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      menu_item_id INTEGER NOT NULL REFERENCES menu_items(id),
+      name TEXT NOT NULL,
+      price_rupees INTEGER NOT NULL,
+      quantity INTEGER NOT NULL
+    );
+    INSERT INTO order_items SELECT * FROM order_items_old;
+    DROP TABLE order_items_old;
+  `);
+  db.pragma("foreign_keys = ON");
+}
+
 export default db;

@@ -43,6 +43,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ role, email, password }),
     }),
+  resetPassword: ({ role, email, password }) =>
+    request("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ role, email, password }),
+    }),
   getAllMenuItems: () => request("/menu/all"),
   createMenuItem: (item) =>
     request("/menu", { method: "POST", body: JSON.stringify(item) }),

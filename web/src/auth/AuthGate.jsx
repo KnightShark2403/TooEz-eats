@@ -60,6 +60,12 @@ export default function AuthGate({ role, children }) {
 
   const t = THEME[role];
 
+  const switchMode = (m) => {
+    setMode(m);
+    setError(null);
+    setForm((f) => ({ ...f, password: "" }));
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -69,7 +75,12 @@ export default function AuthGate({ role, children }) {
         mode === "signup"
           ? { role, email: form.email, password: form.password, name: form.name }
           : { role, email: form.email, password: form.password };
-      const result = mode === "signup" ? await api.signup(payload) : await api.login(payload);
+      const result =
+        mode === "signup"
+          ? await api.signup(payload)
+          : mode === "reset"
+          ? await api.resetPassword(payload)
+          : await api.login(payload);
       setSession(result.token, result.user);
       setUser(result.user);
     } catch (err) {
@@ -117,39 +128,80 @@ export default function AuthGate({ role, children }) {
           {t.brand}
         </p>
         <h1 style={{ fontSize: 26, margin: "0 0 8px", color: t.text }}>
-          {mode === "login" ? t.title : "Create your account"}
+          {mode === "login" ? t.title : mode === "signup" ? "Create your account" : "Reset your password"}
         </h1>
         <p style={{ color: t.subtext, margin: "0 0 20px", fontSize: 14 }}>
-          {mode === "login" ? t.subtitle : `Sign up as ${role === "staff" ? "canteen staff" : "a student"}.`}
+          {mode === "login"
+            ? t.subtitle
+            : mode === "signup"
+            ? `Sign up as ${role === "staff" ? "canteen staff" : "a student"}.`
+            : "Enter your email and choose a new password."}
         </p>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          {["login", "signup"].map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: m === mode ? "none" : `1px solid ${t.border}`,
-                background: m === mode ? t.button : "transparent",
-                color: m === mode ? t.buttonText : t.subtext,
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            >
-              {m === "login" ? "Log in" : "Sign up"}
-            </button>
-          ))}
-        </div>
+        {mode === "reset" ? (
+          <button
+            type="button"
+            onClick={() => switchMode("login")}
+            style={{
+              background: "none",
+              border: "none",
+              color: t.subtext,
+              fontSize: 13,
+              cursor: "pointer",
+              padding: 0,
+              marginBottom: 20,
+            }}
+          >
+            ← Back to log in
+          </button>
+        ) : (
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {["login", "signup"].map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => switchMode(m)}
+                style={{
+                  flex: 1,
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: m === mode ? "none" : `1px solid ${t.border}`,
+                  background: m === mode ? t.button : "transparent",
+                  color: m === mode ? t.buttonText : t.subtext,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                {m === "login" ? "Log in" : "Sign up"}
+              </button>
+            ))}
+          </div>
+        )}
 
         <form onSubmit={submit}>
           {mode === "signup" && field("name", "Your name")}
           {field("email", "Email", "email")}
-          {field("password", "Password", "password")}
+          {field("password", mode === "reset" ? "New password" : "Password", "password")}
+
+          {mode === "login" && (
+            <button
+              type="button"
+              onClick={() => switchMode("reset")}
+              style={{
+                background: "none",
+                border: "none",
+                color: t.subtext,
+                fontSize: 13,
+                cursor: "pointer",
+                padding: 0,
+                marginBottom: 12,
+                textDecoration: "underline",
+              }}
+            >
+              Forgot password?
+            </button>
+          )}
 
           {error && (
             <p style={{ color: "var(--status-new)", fontSize: 13, marginBottom: 12 }}>{error}</p>
@@ -171,7 +223,13 @@ export default function AuthGate({ role, children }) {
               opacity: submitting ? 0.7 : 1,
             }}
           >
-            {submitting ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
+            {submitting
+              ? "Please wait…"
+              : mode === "login"
+              ? "Log in"
+              : mode === "signup"
+              ? "Create account"
+              : "Reset password"}
           </button>
         </form>
       </div>

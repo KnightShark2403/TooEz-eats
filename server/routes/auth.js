@@ -64,4 +64,32 @@ router.post("/login", async (req, res) => {
   res.json({ token: signToken(user), user });
 });
 
+// POST /api/auth/reset-password  { role, email, password }
+// STUB reset flow — this demo has no email/SMS provider to deliver a reset
+// link through, so identity is confirmed by (role, email) match alone.
+// Swap for a verified token-based flow before this handles real accounts.
+router.post("/reset-password", async (req, res) => {
+  const { role, password } = req.body;
+  const email = normalizeEmail(req.body.email);
+
+  if (!["student", "staff", "manager"].includes(role)) {
+    return res.status(400).json({ error: "role must be student, staff, or manager" });
+  }
+  if (!email) return res.status(400).json({ error: "Email is required" });
+  if (!password || password.length < 6) {
+    return res.status(400).json({ error: "Password must be at least 6 characters" });
+  }
+
+  const row = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+  if (!row || row.role !== role) {
+    return res.status(404).json({ error: "No account found with that email" });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(passwordHash, row.id);
+
+  const user = { id: row.id, role: row.role, email: row.email, name: row.name };
+  res.json({ token: signToken(user), user });
+});
+
 export default router;
