@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+
+html, body {
+  background: #08090c;
+  color: #e2e6ee;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image:
+    radial-gradient(900px 480px at 8% -10%, rgba(91,141,239,0.09), transparent 60%),
+    radial-gradient(700px 400px at 95% 0%, rgba(47,191,113,0.05), transparent 55%);
+  background-attachment: fixed;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #232936; border-radius: 6px; border: 2px solid #08090c; }
+::-webkit-scrollbar-thumb:hover { background: #313a4c; }
+
+.tnum { font-variant-numeric: tabular-nums; }
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-ink-700/70 bg-ink-850/80 shadow-card backdrop-blur-sm;
+  }
+  .card-pad { @apply p-5; }
+  .label {
+    @apply text-[10.5px] font-semibold uppercase tracking-[0.13em] text-ink-400;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-medium
+           transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45;
+  }
+  .btn-primary { @apply btn bg-accent text-white hover:bg-accent-dim; }
+  .btn-ghost   { @apply btn border border-ink-600 bg-ink-800 text-ink-200 hover:border-ink-500 hover:bg-ink-700; }
+  .btn-good    { @apply btn bg-good text-[#04180e] hover:brightness-110; }
+  .btn-bad     { @apply btn border border-bad/40 bg-bad/10 text-bad hover:bg-bad/20; }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium;
+  }
+}
+
+@keyframes vetoPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(240,87,106,0.42); }
+  70%  { box-shadow: 0 0 0 14px rgba(240,87,106,0); }
+  100% { box-shadow: 0 0 0 0 rgba(240,87,106,0); }
+}
+.veto-pulse { animation: vetoPulse 1.6s ease-out 2; }
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+.row-in { animation: rowIn 220ms ease-out; }
+
+@keyframes shimmer { 100% { background-position: 200% 0; } }
+.skeleton {
+  background: linear-gradient(90deg, #161a23 0%, #1e232e 40%, #161a23 80%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
