@@ -2,15 +2,19 @@
   "name": "tooez",
   "version": "1.0.0",
   "private": true,
-  "description": "TooEz — AI Revenue Agents for Agentic Commerce",
+  "description": "TooEz \u2014 AI Revenue Agents for Agentic Commerce",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "next lint",
+    "lint": "tsc --noEmit",
     "db:reset": "node scripts/reset-db.mjs",
     "test:pipeline": "node scripts/test-pipeline.mjs",
-    "test:webhook": "node scripts/send-webhook.mjs"
+    "test:webhook": "node scripts/send-webhook.mjs",
+    "test:razorpay": "node scripts/test-razorpay.mjs",
+    "test": "node scripts/test-pipeline.mjs && node scripts/test-razorpay.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:checkout": "node scripts/test-checkout.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",

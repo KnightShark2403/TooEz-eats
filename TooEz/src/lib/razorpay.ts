@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 import Razorpay from 'razorpay';
+import { envReport } from './env';
+import { log } from './logger';
 
 /**
  * Razorpay adapter.
@@ -20,7 +22,7 @@ import Razorpay from 'razorpay';
 export type Gateway = 'razorpay' | 'mock';
 
 export function gatewayMode(): Gateway {
-  return process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET ? 'razorpay' : 'mock';
+  return envReport().gateway;
 }
 
 export function publicKeyId(): string | null {
@@ -28,7 +30,16 @@ export function publicKeyId(): string | null {
 }
 
 export function isTestMode(): boolean {
-  return (process.env.RAZORPAY_KEY_ID ?? '').startsWith('rzp_test_');
+  return envReport().testMode;
+}
+
+/** Throws with an actionable message when credentials are missing or malformed. */
+export function assertConfigured() {
+  const r = envReport();
+  if (r.problems.length) throw new Error(r.problems.join(' '));
+  if (r.gateway !== 'razorpay') {
+    throw new Error('Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env.local.');
+  }
 }
 
 let _client: Razorpay | null = null;
@@ -107,4 +118,40 @@ export async function fetchPayment(paymentId: string) {
 
 export async function fetchOrderPayments(orderId: string) {
   return client().orders.fetchPayments(orderId);
+}
+
+
+// ---------------------------------------------------------------------------
+// Refunds — a privileged operation. Only the server may call this, because it
+// requires the key secret. The dashboard asks the backend; the backend asks
+// Razorpay.
+// ---------------------------------------------------------------------------
+
+export interface CreatedRefund {
+  id: string; amount: number; status: string; speed: string | null; gateway: Gateway;
+}
+
+export async function createRefund(args: {
+  paymentId: string; amountPaise?: number; idempotencyKey: string; notes?: Record<string, string>;
+}): Promise<CreatedRefund> {
+  if (gatewayMode() === 'mock') {
+    return {
+      id: `mock_rfnd_${crypto.randomBytes(7).toString('hex')}`,
+      amount: args.amountPaise ?? 0, status: 'processed', speed: 'normal', gateway: 'mock',
+    };
+  }
+  assertConfigured();
+  try {
+    const r: any = await client().payments.refund(args.paymentId, {
+      ...(args.amountPaise ? { amount: args.amountPaise } : {}),
+      speed: 'normal',
+      notes: args.notes ?? {},
+      receipt: args.idempotencyKey.slice(0, 40),
+    });
+    log.info('razorpay', 'refund created', { refundId: r.id, paymentId: args.paymentId, amount: r.amount });
+    return { id: r.id, amount: Number(r.amount), status: r.status, speed: r.speed ?? null, gateway: 'razorpay' };
+  } catch (e) {
+    log.error('razorpay', 'refund failed', { paymentId: args.paymentId, error: describeError(e) });
+    throw new Error(describeError(e));
+  }
 }

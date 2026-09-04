@@ -5,6 +5,17 @@
  *   -> Razorpay/mock order -> webhook capture -> dashboard revenue
  * Plus: duplicate-order prevention, webhook replay, and the failure/retry path.
  */
+import fs from 'node:fs';
+// Load .env.local so the webhook payloads are signed with the same secret the
+// server verifies against. Without this the test would exercise the mock path.
+for (const f of ['.env.local', '.env']) {
+  if (!fs.existsSync(f)) continue;
+  for (const line of fs.readFileSync(f, 'utf8').split('\n')) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+}
+
 const BASE = process.env.TOOEZ_BASE_URL || 'http://localhost:3000';
 const inr = (p) => '₹' + (p / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 

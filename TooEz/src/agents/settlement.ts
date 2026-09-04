@@ -5,6 +5,7 @@ import { publishRefresh } from '@/lib/events';
 import { inr } from '@/lib/money';
 import * as rzp from '@/lib/razorpay';
 import { recordOutcome } from './pricing-model';
+import { log } from '@/lib/logger';
 
 /**
  * SETTLEMENT AGENT
@@ -35,7 +36,8 @@ export interface CreateOrderResult {
 }
 
 export async function createOrderForCampaign(args: {
-  merchantId: string; campaignId: string; idempotencyKey: string; customerRef?: string;
+  merchantId: string; campaignId: string; idempotencyKey: string;
+  customerRef?: string; customerName?: string; customerPhone?: string;
 }): Promise<CreateOrderResult> {
   const db = getDb();
   const campaign = db.prepare(
@@ -81,9 +83,11 @@ export async function createOrderForCampaign(args: {
 
   if (!existing) {
     db.prepare(
-      `INSERT INTO orders (id,campaign_id,merchant_id,idempotency_key,amount_paise,status,gateway,customer_ref)
-       VALUES (?,?,?,?,?, 'CREATED', ?, ?)`
-    ).run(orderId, campaign.id, args.merchantId, args.idempotencyKey, campaign.price_paise, gateway, args.customerRef ?? null);
+      `INSERT INTO orders (id,campaign_id,merchant_id,idempotency_key,amount_paise,status,gateway,
+        customer_ref,customer_name,customer_phone)
+       VALUES (?,?,?,?,?, 'CREATED', ?,?,?,?)`
+    ).run(orderId, campaign.id, args.merchantId, args.idempotencyKey, campaign.price_paise, gateway,
+      args.customerRef ?? null, args.customerName ?? null, args.customerPhone ?? null);
   }
 
   let created;
@@ -132,7 +136,7 @@ export async function createOrderForCampaign(args: {
  * verified, but this NEVER marks the order paid — it only records that the
  * customer's browser claims success. Razorpay's webhook is the source of truth.
  */
-export function noteCheckoutReturn(args: {
+export async function noteCheckoutReturn(args: {
   merchantId: string; razorpayOrderId: string; razorpayPaymentId: string; signature: string;
 }) {
   const db = getDb();
@@ -160,10 +164,25 @@ export function noteCheckoutReturn(args: {
   audit({
     merchantId: args.merchantId, actor: 'SETTLEMENT_AGENT', action: 'CHECKOUT_RETURN_VERIFIED',
     severity: 'info', orderId: order.id, campaignId: order.campaign_id,
-    summary: `Checkout signature verified for ${args.razorpayPaymentId}. Holding at AWAITING_CONFIRMATION — revenue is not booked until Razorpay's webhook confirms capture.`,
+    summary: `Checkout signature verified for ${args.razorpayPaymentId}. Held at AWAITING_CONFIRMATION — the browser's word is not enough.`,
     detail: { razorpayOrderId: args.razorpayOrderId, razorpayPaymentId: args.razorpayPaymentId },
   });
   publishRefresh('checkout-returned');
+
+  // ---- Immediate confirmation via a server-side Razorpay API call ---------
+  // The customer is waiting, so we do not sit on AWAITING_CONFIRMATION until a
+  // webhook arrives. We ASK RAZORPAY directly. This is authoritative in exactly
+  // the same way the webhook is — it comes from Razorpay over an authenticated
+  // channel, not from the browser. The webhook remains the async safety net and
+  // is deduplicated against whatever this call settles.
+  if (rzp.gatewayMode() === 'razorpay') {
+    try {
+      const settled = await reconcileOrder(args.merchantId, order.id);
+      if (settled.status === 'PAID') return { ok: true, status: 'PAID', verified: true, source: 'api_reconcile' };
+    } catch (e: any) {
+      log.warn('settlement', 'immediate reconcile failed; awaiting webhook', { orderId: order.id, error: e.message });
+    }
+  }
   return { ok: true, status: 'AWAITING_CONFIRMATION', verified: true };
 }
 
@@ -228,6 +247,8 @@ export function processWebhook(args: {
       result = handleFailed(args.merchantId, body);
     } else if (event === 'payment.authorized') {
       result = 'authorized_noop';
+    } else if (event === 'refund.processed' || event === 'refund.failed') {
+      result = handleRefundEvent(args.merchantId, body, event);
     }
   } finally {
     db.prepare(
@@ -278,7 +299,10 @@ function handleCaptured(merchantId: string, body: any, source: 'webhook' | 'api_
     ).run(pay?.id ?? `unknown_${Date.now()}`, order.id, rzpOrderId, amount, 'captured',
       pay?.method ?? null, source, JSON.stringify(pay ?? body));
 
-    db.prepare(`UPDATE orders SET status='PAID', updated_at=datetime('now') WHERE id=?`).run(order.id);
+    db.prepare(
+      `UPDATE orders SET status='PAID', payment_method=?, captured_at=datetime('now'), updated_at=datetime('now')
+        WHERE id=?`
+    ).run(pay?.method ?? null, order.id);
 
     const c = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(order.campaign_id) as any;
     db.prepare(
@@ -331,8 +355,11 @@ function handleFailed(merchantId: string, body: any): string {
     'failed', pay?.method ?? null, pay?.error_code ?? null, pay?.error_description ?? null,
     'webhook', JSON.stringify(pay ?? body));
 
-  db.prepare(`UPDATE orders SET status='FAILED', failure_reason=?, updated_at=datetime('now') WHERE id=?`)
-    .run(pay?.error_description ?? pay?.error_code ?? 'payment failed', order.id);
+  db.prepare(
+    `UPDATE orders SET status='FAILED', failure_reason=?, failure_code=?, payment_method=?, updated_at=datetime('now')
+      WHERE id=?`
+  ).run(pay?.error_description ?? pay?.error_code ?? 'payment failed',
+        pay?.error_code ?? null, pay?.method ?? null, order.id);
 
   audit({
     merchantId, actor: 'RAZORPAY', action: 'PAYMENT_FAILED', severity: 'error',
@@ -404,4 +431,141 @@ export async function reconcileOrder(merchantId: string, orderId: string) {
     detail: { result: res.result },
   });
   return { status: 'PAID', changed: true };
+}
+
+
+// ---------------------------------------------------------------------------
+// Refunds
+// ---------------------------------------------------------------------------
+
+/**
+ * Issue a refund for a captured payment. The dashboard calls the backend; the
+ * backend holds the key secret and calls Razorpay. The browser never touches a
+ * privileged credential.
+ *
+ * Idempotent on (payment_id, idempotency_key), so a double-click on the
+ * dashboard's Refund button cannot refund twice.
+ */
+export async function refundOrder(args: {
+  merchantId: string; orderId: string; amountPaise?: number; reason?: string; idempotencyKey: string;
+}) {
+  const db = getDb();
+  const order = db.prepare('SELECT * FROM orders WHERE id = ? AND merchant_id = ?')
+    .get(args.orderId, args.merchantId) as any;
+  if (!order) throw new Error('order not found');
+  if (order.status !== 'PAID') throw new Error(`order is ${order.status} — only PAID orders can be refunded`);
+
+  const payment = db.prepare(
+    `SELECT * FROM payments WHERE order_id = ? AND status = 'captured' ORDER BY created_at DESC LIMIT 1`
+  ).get(order.id) as any;
+  if (!payment) throw new Error('no captured payment found for this order');
+
+  const already = db.prepare(
+    'SELECT * FROM refunds WHERE payment_id = ? AND idempotency_key = ?'
+  ).get(payment.id, args.idempotencyKey) as any;
+  if (already) {
+    audit({
+      merchantId: args.merchantId, actor: 'SETTLEMENT_AGENT', action: 'REFUND_DEDUPED', severity: 'warn',
+      orderId: order.id, campaignId: order.campaign_id,
+      summary: `Duplicate refund request blocked — returned existing refund ${already.id}`,
+      detail: { refundId: already.id },
+    });
+    return { refundId: already.id, status: already.status, amountPaise: already.amount_paise, reused: true };
+  }
+
+  const refundedSoFar = (db.prepare(
+    `SELECT COALESCE(SUM(amount_paise),0) AS a FROM refunds WHERE payment_id = ? AND status != 'failed'`
+  ).get(payment.id) as { a: number }).a;
+  const amount = args.amountPaise ?? (payment.amount_paise - refundedSoFar);
+  if (amount <= 0) throw new Error('this payment is already fully refunded');
+  if (amount + refundedSoFar > payment.amount_paise) {
+    throw new Error(`refund of ${inr(amount)} exceeds the ${inr(payment.amount_paise - refundedSoFar)} still refundable`);
+  }
+
+  let created;
+  try {
+    created = await rzp.createRefund({
+      paymentId: payment.id, amountPaise: amount, idempotencyKey: args.idempotencyKey,
+      notes: { tooez_order_id: order.id, reason: (args.reason ?? 'merchant refund').slice(0, 100) },
+    });
+  } catch (e: any) {
+    audit({
+      merchantId: args.merchantId, actor: 'SETTLEMENT_AGENT', action: 'REFUND_FAILED', severity: 'error',
+      orderId: order.id, campaignId: order.campaign_id,
+      summary: `Refund could not be created — ${e.message}`, detail: { error: e.message },
+    });
+    publishRefresh('refund-failed');
+    throw e;
+  }
+
+  db.prepare(
+    `INSERT INTO refunds (id,order_id,payment_id,merchant_id,amount_paise,status,speed,reason,idempotency_key,confirmed_source)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`
+  ).run(created.id, order.id, payment.id, args.merchantId, amount,
+    created.status === 'processed' ? 'processed' : 'pending', created.speed, args.reason ?? null,
+    args.idempotencyKey, 'api');
+
+  const fullyRefunded = refundedSoFar + amount >= payment.amount_paise;
+  if (created.status === 'processed') applyRefundToLedger(args.merchantId, order, amount, fullyRefunded);
+
+  audit({
+    merchantId: args.merchantId, actor: 'SETTLEMENT_AGENT', action: 'REFUND_CREATED',
+    severity: 'warn', orderId: order.id, campaignId: order.campaign_id,
+    summary: `Refund ${created.id} for ${inr(amount)} created against payment ${payment.id} (${created.status})`,
+    detail: { refundId: created.id, amount, status: created.status, reason: args.reason },
+  });
+  publishRefresh('refund');
+  return { refundId: created.id, status: created.status, amountPaise: amount, reused: false };
+}
+
+/** Reverses the revenue and restores stock. Called once per refund. */
+function applyRefundToLedger(merchantId: string, order: any, amount: number, fullyRefunded: boolean) {
+  const db = getDb();
+  const tx = db.transaction(() => {
+    const c = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(order.campaign_id) as any;
+    db.prepare('UPDATE campaigns SET revenue_paise = MAX(0, revenue_paise - ?) WHERE id = ?')
+      .run(amount, order.campaign_id);
+    if (fullyRefunded) {
+      db.prepare('UPDATE campaigns SET units_sold = MAX(0, units_sold - 1) WHERE id = ?').run(order.campaign_id);
+      db.prepare('UPDATE products SET stock_units = stock_units + 1 WHERE id = ?').run(c.product_id);
+      db.prepare(`UPDATE orders SET status='REFUNDED', updated_at=datetime('now') WHERE id=?`).run(order.id);
+    } else {
+      db.prepare(`UPDATE orders SET status='PARTIALLY_REFUNDED', updated_at=datetime('now') WHERE id=?`).run(order.id);
+    }
+  });
+  tx();
+}
+
+function handleRefundEvent(merchantId: string, body: any, event: string): string {
+  const db = getDb();
+  const r = body?.payload?.refund?.entity;
+  if (!r?.id) return 'no_refund_id';
+  const existing = db.prepare('SELECT * FROM refunds WHERE id = ?').get(r.id) as any;
+  if (!existing) {
+    log.warn('webhook', 'refund event for an unknown refund', { refundId: r.id, event });
+    return 'unknown_refund';
+  }
+  if (existing.status === 'processed' && event === 'refund.processed') return 'already_processed';
+
+  const status = event === 'refund.processed' ? 'processed' : 'failed';
+  db.prepare(`UPDATE refunds SET status=?, confirmed_source='webhook', updated_at=datetime('now') WHERE id=?`)
+    .run(status, r.id);
+
+  if (status === 'processed' && existing.status !== 'processed') {
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(existing.order_id) as any;
+    const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(existing.payment_id) as any;
+    const refunded = (db.prepare(
+      `SELECT COALESCE(SUM(amount_paise),0) AS a FROM refunds WHERE payment_id = ? AND status = 'processed'`
+    ).get(existing.payment_id) as { a: number }).a;
+    applyRefundToLedger(merchantId, order, existing.amount_paise, refunded >= (payment?.amount_paise ?? 0));
+  }
+
+  audit({
+    merchantId, actor: 'RAZORPAY', action: status === 'processed' ? 'REFUND_PROCESSED' : 'REFUND_FAILED',
+    severity: status === 'processed' ? 'warn' : 'error',
+    orderId: existing.order_id,
+    summary: `Refund ${r.id} ${status} — confirmed by Razorpay webhook`,
+    detail: { refundId: r.id, amount: existing.amount_paise },
+  });
+  return `refund_${status}`;
 }

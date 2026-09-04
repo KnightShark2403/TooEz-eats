@@ -22,28 +22,39 @@ Razorpay track: **AI Growth & Agentic Commerce**.
 
 ---
 
-## Quick start (3 commands)
+## Quick start
 
 ```bash
 npm install
-cp .env.example .env.local     # optional — see "Razorpay setup" below
-npm run dev                    # http://localhost:3000
+cp .env.example .env.local     # then paste your Razorpay TEST keys
+npm run dev                    # http://localhost:3000/dashboard
 ```
 
-With no keys at all the app boots and the whole agent pipeline works on a clearly
-labelled **mock gateway** (the UI shows a `MOCK GATEWAY` badge everywhere). Add
-Razorpay test keys and the same code path runs against the real Razorpay API.
+**[SETUP.md](SETUP.md)** has the full Razorpay wiring — which credential goes where,
+the exact webhook URL, which events to subscribe to, and a complete test transaction.
+**[ARCHITECTURE.md](ARCHITECTURE.md)** has the data flow and the repository map.
+
+With no keys at all the app still boots, on a clearly badged **mock gateway**, so the
+agent pipeline can be developed offline. Add Razorpay test keys and the mock is
+disabled outright.
 
 Production build: `npm run build && npm start`.
 
+| Surface | URL |
+|---|---|
+| Merchant dashboard | `/dashboard` |
+| Customer food app | `/shop/<campaignId>` |
+| Configuration health | `/api/health` |
+
 ### The 60-second demo
 
-1. Open `http://localhost:3000`, press **Scan for opportunities**.
+1. Open `/dashboard/agents`, press **Scan for opportunities**.
 2. Click **Run agents** on *Chicken Wrap + Fries Combo* (₹755 recoverable).
 3. Watch the Offer Agent propose **₹79** and the Risk Agent **VETO** it on four
    separate policy rules, then re-optimise to **₹109** and get approved.
 4. Press **Approve campaign**, then **Open customer checkout**.
-5. Pay. Revenue appears on the dashboard only when the webhook confirms capture.
+5. Pay in Razorpay's test Checkout. Revenue appears on the dashboard only after
+   Razorpay itself confirms the capture — never on the browser's say-so.
 
 `DEMO.md` has the full 2-minute choreography, `PITCH.md` the 4-minute script.
 
@@ -102,6 +113,9 @@ discount — the pipeline abandons with no campaign at all.
 Razorpay is not a payment button bolted on the end. It is the execution layer that
 turns an agent decision into money, and its webhook is the system's source of truth.
 
+The dashboard is not part of that path: it reads `/api/dashboard/*`, which reads the
+database. It holds no Razorpay credential and makes no Razorpay call.
+
 **What is implemented**
 
 - Order creation with the official `razorpay` Node SDK (`orders.create`, amounts in paise).
@@ -123,20 +137,26 @@ turns an agent decision into money, and its webhook is the system's source of tr
 - **Failure handling**: `payment.failed` marks the order `FAILED` permanently; a retry
   creates a *new* order linked by `parent_order_id`, so a late webhook for the failed
   attempt can never resurrect it as revenue.
+- **Immediate verification**: when Checkout returns, the server verifies the
+  signature *and then asks Razorpay directly* (`orders.fetchPayments`) rather than
+  leaving the customer waiting on an asynchronous webhook.
+- **Refunds**: `payments.refund` through the backend, with `UNIQUE(payment_id,
+  idempotency_key)`, a refunded-total guard, and `refund.processed` / `refund.failed`
+  webhook handling that reverses revenue and restores stock.
 - **Reconciliation**: `orders.fetchPayments(order_id)` as a second, equally valid
   source of truth when a webhook cannot reach you.
 
-**Razorpay setup**
+**Razorpay setup** — full walkthrough in [SETUP.md](SETUP.md). In short:
 
-1. Sign in to the Razorpay Dashboard and stay in **Test Mode**.
-2. *Account & Settings → API Keys → Generate Test Key.* Put the pair in `.env.local` as
-   `RAZORPAY_KEY_ID` (starts `rzp_test_`) and `RAZORPAY_KEY_SECRET`.
-3. *Settings → Webhooks → Add New Webhook.*
-   - URL: `https://<your-public-url>/api/webhooks/razorpay`
-   - Secret: any strong string — put the **same** value in `RAZORPAY_WEBHOOK_SECRET`.
-   - Active events: `payment.captured`, `payment.failed`, `order.paid`.
-4. Expose localhost: `ngrok http 3000`, then use the https URL from step 3.
-5. Restart `npm run dev` so the new env vars load.
+1. Razorpay Dashboard, **Test Mode**. *Account & Settings → API Keys → Generate Test Key.*
+2. Put the pair in `.env.local` as `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`.
+3. *Settings → Webhooks → Add New Webhook*, URL
+   `https://<public-url>/api/webhooks/razorpay`, secret = a string you choose which
+   you also put in `RAZORPAY_WEBHOOK_SECRET` (**not** the key secret — they are
+   different secrets, and TooEz rejects them being equal).
+4. Events: `payment.captured`, `payment.failed`, `order.paid`, `refund.processed`,
+   `refund.failed`.
+5. `ngrok http 3000` to expose localhost, then restart `npm run dev`.
 
 Test cards / VPAs: card `4111 1111 1111 1111`, any future expiry, any CVV, OTP `1111`;
 UPI `success@razorpay` and `failure@razorpay`.
@@ -155,9 +175,10 @@ UPI `success@razorpay` and `failure@razorpay`.
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `RAZORPAY_KEY_ID` | for real payments | Test key id (`rzp_test_…`). Sent to the browser by design. |
-| `RAZORPAY_KEY_SECRET` | for real payments | Server-only. Signs and verifies checkout signatures. |
-| `RAZORPAY_WEBHOOK_SECRET` | for webhooks | Verifies inbound webhook HMACs. When set, signature verification is enforced in every mode. |
+| `RAZORPAY_KEY_ID` | for real payments | Test key id (`rzp_test_…`). **Public** — sent to the browser on the checkout page by design. |
+| `RAZORPAY_KEY_SECRET` | for real payments | **Server only.** Authenticates API calls and verifies checkout signatures. Never reaches the browser or the logs. |
+| `RAZORPAY_WEBHOOK_SECRET` | for webhooks | **Server only.** A *different* secret from the key secret; verifies inbound webhook HMACs. |
+| `TOOEZ_MERCHANT_OWNER` | no | Name used in the dashboard greeting. |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | no | Enables LLM *narration only*. |
 | `ANTHROPIC_MODEL` / `OPENAI_MODEL` | no | Model override. |
 | `TOOEZ_DB_PATH` | no | SQLite file location. Default `./data/tooez.db`. |
@@ -230,14 +251,23 @@ legacy/                The repo's previous, unrelated project — untouched
 ## Tests
 
 ```bash
-npm run dev            # in one terminal
-npm run test:pipeline  # in another
+npm run dev             # terminal 1
+
+npm run test:pipeline   # agent pipeline + webhook contract (33 assertions)
+npm run test:razorpay   # REAL Razorpay test-mode integration (35 assertions)
+npm test                # both
+npm run test:checkout   # full browser run through the real Razorpay Checkout
 ```
 
-Asserts the whole demo path end to end: detection → veto → revision → approval →
-order → idempotency → the frontend's inability to mark an order paid → webhook capture
-→ replay protection → failure → retry → learning-loop update → audit completeness.
-All 33 checks pass.
+`test:pipeline` covers detection → veto → revision → approval → order → idempotency →
+the frontend's inability to mark an order paid → webhook capture → replay protection →
+failure → retry → learning-loop update → audit completeness.
+
+`test:razorpay` creates a real order through the app and then **independently fetches
+it from Razorpay**, asserting that the amount, receipt and `notes.tooez_order_id` all
+match — proving the mapping in both directions. It also covers forged signatures,
+unknown orders, duplicate deliveries, amount tampering, failed payments, refunds, and
+the absence of any secret in a dashboard payload.
 
 ---
 
@@ -263,6 +293,8 @@ All 33 checks pass.
 
 **Not implemented**
 - Razorpay Route / split settlement, Payment Links, and Razorpay's fraud signals
-  (P2 items — a fully working payment + webhook was the higher priority).
-- Multi-merchant auth. One seeded merchant, no login.
-- POS/inventory connectors.
+  (P2 items — a fully working payment + webhook + refund path was the higher priority).
+- Authentication. One seeded merchant, no login — so there is no session to protect
+  yet. Add auth before exposing this beyond a demo.
+- Editing the menu from the dashboard. Products, stock and unit costs come from the
+  seeded merchant record; production would sync them from a POS.

@@ -7,9 +7,14 @@ export const dynamic = 'force-dynamic';
 /**
  * Called from Razorpay Checkout's success handler.
  *
- * This endpoint verifies the checkout signature but CANNOT mark an order paid.
- * The best outcome it can produce is AWAITING_CONFIRMATION. Revenue is booked
- * only by /api/webhooks/razorpay (or a server-side API reconcile).
+ * The browser's claim of success is never trusted. This endpoint:
+ *   1. verifies the checkout HMAC signature, then
+ *   2. asks RAZORPAY directly (server-side, authenticated) whether the payment
+ *      actually captured — giving the customer an immediate, authoritative answer.
+ *
+ * If Razorpay cannot be reached the order stays at AWAITING_CONFIRMATION and the
+ * webhook settles it asynchronously. Either way the source of truth is Razorpay,
+ * never the client.
  */
 export async function POST(req: Request) {
   const b = await req.json().catch(() => ({}));
@@ -18,7 +23,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'missing razorpay ids' }, { status: 400 });
   }
   try {
-    const r = noteCheckoutReturn({
+    const r = await noteCheckoutReturn({
       merchantId: MERCHANT_ID,
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,

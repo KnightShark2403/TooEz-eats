@@ -5,6 +5,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS merchants (
   id            TEXT PRIMARY KEY,
   name          TEXT NOT NULL,
+  owner_name    TEXT,
   vertical      TEXT NOT NULL,
   timezone      TEXT NOT NULL DEFAULT 'Asia/Kolkata',
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -134,7 +135,12 @@ CREATE TABLE IF NOT EXISTS orders (
   status             TEXT NOT NULL,   -- CREATED | AWAITING_CONFIRMATION | PAID | FAILED | ABANDONED
   gateway            TEXT NOT NULL,   -- razorpay | mock
   customer_ref       TEXT,
+  customer_name      TEXT,
+  customer_phone     TEXT,
+  payment_method     TEXT,     -- upi | card | netbanking | wallet — from Razorpay
+  captured_at        TEXT,     -- when Razorpay confirmed capture
   failure_reason     TEXT,
+  failure_code       TEXT,
   attempt_no         INTEGER NOT NULL DEFAULT 1,
   parent_order_id    TEXT,            -- set when this order is a retry of a failed one
   created_at         TEXT NOT NULL DEFAULT (datetime('now')),
@@ -208,3 +214,22 @@ CREATE TABLE IF NOT EXISTS organic_sales (
   sold_at          TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_organic_product ON organic_sales(product_id, sold_at);
+
+-- Refunds. A privileged Razorpay operation: only the backend holds the key
+-- secret, so the dashboard requests a refund and the server performs it.
+CREATE TABLE IF NOT EXISTS refunds (
+  id                 TEXT PRIMARY KEY,          -- razorpay refund id (rfnd_…) or local id before confirmation
+  order_id           TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  payment_id         TEXT NOT NULL,
+  merchant_id        TEXT NOT NULL,
+  amount_paise       INTEGER NOT NULL,
+  status             TEXT NOT NULL,             -- pending | processed | failed
+  speed              TEXT,
+  reason             TEXT,
+  idempotency_key    TEXT NOT NULL,
+  confirmed_source   TEXT,                      -- webhook | api
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (payment_id, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_refunds_order ON refunds(order_id);

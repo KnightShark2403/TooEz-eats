@@ -1,6 +1,5 @@
 import { getDb } from './db';
-import { gatewayMode, isTestMode, publicKeyId } from './razorpay';
-import { llmEnabled } from './llm';
+import { publicGatewayInfo } from './env';
 import { discountSpentToday, getPolicies, activeCampaignCount } from '@/agents/risk';
 import { buildLadder } from '@/agents/pricing-model';
 import type { Product } from '@/agents/types';
@@ -65,13 +64,7 @@ export function dashboardState(merchantId: string) {
   return {
     merchant,
     policies,
-    gateway: {
-      mode: gatewayMode(),
-      testMode: isTestMode(),
-      keyId: publicKeyId(),
-      webhookConfigured: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET),
-      llm: llmEnabled(),
-    },
+    gateway: publicGatewayInfo(),
     kpis: {
       todayRevenuePaise: organic.r + agentRevenue.r,
       organicRevenuePaise: organic.r,

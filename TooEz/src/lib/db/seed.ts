@@ -22,8 +22,9 @@ export function seed(db: Database.Database) {
   db.exec('BEGIN');
   try {
     db.prepare(
-      `INSERT INTO merchants (id,name,vertical,timezone) VALUES (?,?,?,?)`
-    ).run(DEMO_MERCHANT_ID, 'Campus Kitchen — Block C', 'cloud_kitchen', 'Asia/Kolkata');
+      `INSERT INTO merchants (id,name,owner_name,vertical,timezone) VALUES (?,?,?,?,?)`
+    ).run(DEMO_MERCHANT_ID, 'Campus Kitchen — Block C',
+      process.env.TOOEZ_MERCHANT_OWNER || 'Vetri', 'cloud_kitchen', 'Asia/Kolkata');
 
     db.prepare(
       `INSERT INTO policies (merchant_id,min_margin_pct,max_discount_pct,daily_discount_budget_paise,

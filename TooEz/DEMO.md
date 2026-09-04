@@ -6,26 +6,27 @@
 npm run build && npm start        # or npm run dev
 ```
 
-- Press **Reset demo** in the header. This re-seeds demand history anchored to the
-  current hour, so "demand is falling" is a true reading of the data whenever you demo.
+- **Settings → Integrations → Reset demo dataset.** This re-seeds demand history
+  anchored to the current hour, so "demand is falling" is a true reading of the data
+  whenever you demo.
 - Open two browser windows side by side: **dashboard** left, blank tab right (the
   customer checkout will open there).
-- If you have Razorpay test keys and ngrok running, confirm the header shows
-  `Razorpay TEST · rzp_test_…` and `webhook armed`. If you don't, the header will
-  honestly say `MOCK GATEWAY` — say so out loud, it is a strength, not a gap.
+- Confirm the topbar shows **TEST MODE · Razorpay Test API**. If it says
+  `MOCK GATEWAY`, your keys are not loaded — say so out loud rather than glossing it.
+- Pick a theme and stay in it. Dark reads better on a projector, light on a laptop.
 
 ---
 
 ## The run
 
-**0:00 — The dashboard**
+**0:00 — The dashboard** *(`/dashboard`)*
 
 > "This is a campus cloud kitchen at 2pm. The lunch rush is over. Razorpay would tell
 > them they made ₹9,967 today. TooEz asks a different question."
 
 Point at **Revenue today ₹9,967** and **Discount budget used 80%**.
 
-**0:10 — Detect**
+**0:10 — Detect** *(`/dashboard/agents`)*
 
 Press **Scan for opportunities**. Three cards appear.
 
@@ -86,7 +87,9 @@ Point at the amber panel while it settles:
 
 **1:50 — Learn**
 
-Switch to the dashboard. Revenue has moved. Open the audit trail.
+Switch to **Overview**. Revenue, order count and success rate have moved with no page
+reload. Then open **Payments** — the real `pay_…` id, the `order_…` id, the TooEz order
+id, and whether it was confirmed by webhook or API reconcile.
 
 > "Payment captured, confirmed by webhook. Revenue booked, one unit of inventory
 > released, and the conversion written back into the pricing model — the next
@@ -120,7 +123,8 @@ Press **Run agents** on *Paneer Kathi Roll*.
 
 | Symptom | Fix |
 |---|---|
-| No opportunities after a scan | Press **Reset demo** — it re-anchors demand history to the current hour. |
+| No opportunities after a scan | **Settings → Reset demo dataset** — it re-anchors demand history to the current hour. |
 | Razorpay checkout won't open | The header will say why. Falls back to the mock gateway if you remove the keys and restart. |
-| Payment stuck on AWAITING CONFIRMATION | ngrok is down. Go to **Payments → Reconcile with Razorpay** (a real API call), or run `node scripts/send-webhook.mjs <rzp_order_id> captured 10900`. |
+| Payment stuck on AWAITING CONFIRMATION | ngrok is down. Open the order and press **Reconcile with Razorpay** (a real API call), or run `node scripts/send-webhook.mjs <rzp_order_id> captured 10900`. |
+| Wrong theme for the room | Topbar sun/moon toggle, or **Settings → Appearance**. |
 | Dashboard not updating | The SSE stream fell back to 4-second polling. Wait, or reload. |

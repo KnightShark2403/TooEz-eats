@@ -6,12 +6,16 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  const { campaignId, idempotencyKey, customerRef } = body;
+  const { campaignId, idempotencyKey, customerRef, customerName, customerPhone } = body;
   if (!campaignId || !idempotencyKey) {
     return NextResponse.json({ error: 'campaignId and idempotencyKey are required' }, { status: 400 });
   }
   try {
-    const r = await createOrderForCampaign({ merchantId: MERCHANT_ID, campaignId, idempotencyKey, customerRef });
+    const r = await createOrderForCampaign({
+      merchantId: MERCHANT_ID, campaignId, idempotencyKey, customerRef,
+      customerName: typeof customerName === 'string' ? customerName.slice(0, 80) : undefined,
+      customerPhone: typeof customerPhone === 'string' ? customerPhone.slice(0, 20) : undefined,
+    });
     return NextResponse.json(r);
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 400 });

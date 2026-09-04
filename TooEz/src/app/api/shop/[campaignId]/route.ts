@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { gatewayMode, isTestMode, publicKeyId } from '@/lib/razorpay';
+import { publicGatewayInfo } from '@/lib/env';
 import { MERCHANT_ID } from '@/lib/merchant';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +25,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ campaignId: st
   return NextResponse.json({
     campaign: c,
     remaining: Math.max(0, c.units_offered - c.units_sold),
-    gateway: { mode: gatewayMode(), testMode: isTestMode(), keyId: publicKeyId() },
+    gateway: publicGatewayInfo(),
   }, { headers: { 'cache-control': 'no-store' } });
 }

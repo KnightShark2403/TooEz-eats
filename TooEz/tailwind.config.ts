@@ -1,28 +1,42 @@
 import type { Config } from 'tailwindcss';
 
+/**
+ * Colours are CSS custom properties defined in globals.css, so a single set of
+ * class names renders correctly in both the light (indigo + beige) and dark
+ * (midnight) themes. No component hard-codes a hex value.
+ */
 const config: Config = {
+  darkMode: ['class', '[data-theme="dark"]'],
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
       colors: {
-        ink: {
-          950: '#08090c', 900: '#0c0e13', 850: '#11141b',
-          800: '#161a23', 700: '#1e232e', 600: '#2a3040',
-          500: '#3a4256', 400: '#5b6479', 300: '#8b93a7',
-          200: '#b9c0cf', 100: '#e2e6ee',
-        },
-        accent: { DEFAULT: '#5b8def', dim: '#3f6fd0', soft: '#1a2740' },
-        good: { DEFAULT: '#2fbf71', soft: '#0f2b1e' },
-        bad: { DEFAULT: '#f0576a', soft: '#301218' },
-        warn: { DEFAULT: '#e5a83c', soft: '#2c220e' },
+        bg: 'var(--bg)',
+        surface: 'var(--surface)',
+        'surface-2': 'var(--surface-2)',
+        'surface-sunk': 'var(--surface-sunk)',
+        line: 'var(--border)',
+        'line-strong': 'var(--border-strong)',
+        ink: 'var(--text)',
+        'ink-2': 'var(--text-2)',
+        'ink-3': 'var(--text-3)',
+        'ink-4': 'var(--text-4)',
+        brand: { DEFAULT: 'var(--brand)', alt: 'var(--brand-2)', soft: 'var(--brand-soft)', border: 'var(--brand-border)' },
+        sand: { DEFAULT: 'var(--sand)', soft: 'var(--sand-soft)', border: 'var(--sand-border)' },
+        good: { DEFAULT: 'var(--good)', soft: 'var(--good-soft)', border: 'var(--good-border)' },
+        bad: { DEFAULT: 'var(--bad)', soft: 'var(--bad-soft)', border: 'var(--bad-border)' },
+        warn: { DEFAULT: 'var(--warn)', soft: 'var(--warn-soft)', border: 'var(--warn-border)' },
       },
       fontFamily: {
-        sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Inter', 'sans-serif'],
+        sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Inter', 'Roboto', 'Helvetica Neue', 'sans-serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       boxShadow: {
-        card: '0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 24px -12px rgba(0,0,0,0.7)',
+        sm: 'var(--shadow-sm)',
+        DEFAULT: 'var(--shadow)',
+        lg: 'var(--shadow-lg)',
       },
+      maxWidth: { app: '1560px' },
     },
   },
   plugins: [],
