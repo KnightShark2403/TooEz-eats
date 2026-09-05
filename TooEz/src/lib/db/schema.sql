@@ -148,6 +148,7 @@ CREATE TABLE IF NOT EXISTS orders (
   UNIQUE (campaign_id, idempotency_key)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_rzp ON orders(razorpay_order_id) WHERE razorpay_order_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_external_ref ON orders(customer_ref) WHERE customer_ref LIKE 'tooez_eats:%';
 
 CREATE TABLE IF NOT EXISTS payments (
   id                  TEXT PRIMARY KEY,          -- razorpay payment id (pay_xxx) or mock id

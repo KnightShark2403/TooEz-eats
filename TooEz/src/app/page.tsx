@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import SplashRedirect from '@/components/SplashRedirect';
 
 export default function Home() {
-  redirect('/dashboard');
+  return <SplashRedirect />;
 }

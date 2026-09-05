@@ -118,6 +118,32 @@ html, body {
   text-rendering: optimizeLegibility;
 }
 
+.splash-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.splash-logo {
+  letter-spacing: -0.08em;
+  font-size: clamp(56px, 12vw, 104px);
+  font-weight: 800;
+  line-height: .9;
+  animation: splashIn .7s ease-out both;
+}
+
+.splash-logo strong { color: var(--brand); }
+.splash-tagline { color: var(--text-3); font-size: 14px; animation: splashIn .7s .12s ease-out both; }
+.splash-loader { width: 28px; height: 3px; margin-top: 18px; overflow: hidden; border-radius: 999px; background: var(--border); }
+.splash-loader::after { content: ''; display: block; width: 45%; height: 100%; background: var(--brand); animation: splashLoad 1s ease-in-out infinite; }
+
+@keyframes splashIn { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes splashLoad { from { transform: translateX(-100%); } to { transform: translateX(240%); } }
+
 /* A single, very restrained ground wash — no decorative blobs. */
 body {
   min-height: 100vh;
