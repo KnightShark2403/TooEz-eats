@@ -6,7 +6,11 @@ import { seed } from './seed';
 let _db: Database.Database | null = null;
 
 function dbPath() {
-  const p = process.env.TOOEZ_DB_PATH || path.join(process.cwd(), 'data', 'tooez.db');
+  // Vercel's deployed bundle is read-only; /tmp is writable but ephemeral.
+  const defaultPath = process.env.VERCEL
+    ? path.join('/tmp', 'tooez.db')
+    : path.join(process.cwd(), 'data', 'tooez.db');
+  const p = process.env.TOOEZ_DB_PATH || defaultPath;
   fs.mkdirSync(path.dirname(p), { recursive: true });
   return p;
 }
