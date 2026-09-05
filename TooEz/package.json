@@ -2,7 +2,7 @@
   "name": "tooez",
   "version": "1.0.0",
   "private": true,
-  "description": "TooEz \u2014 AI Revenue Agents for Agentic Commerce",
+  "description": "TooEz — AI Revenue Agents for Agentic Commerce",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
-    "next": "15.1.6",
+    "next": "^15.5.24",
     "razorpay": "^2.9.5",
     "react": "19.0.0",
     "react-dom": "19.0.0"
